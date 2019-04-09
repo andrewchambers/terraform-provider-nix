@@ -8,4 +8,11 @@ your server.
 The example uses the ssh option ```-o StrictHostKeyChecking=accept-new```
 which requires openssh 7.5 or newer.
 
-Enjoy :)
+After building the plugin in the parent directory, you can create the example infrastructure with:
+
+```
+terraform init -plugin-dir ../ 
+terraform apply -var google_cloud_project=your_project_id
+```
+
+Enjoy.
