@@ -13,7 +13,7 @@ Please consult that project to decide which suites your needs better.
 
 ## Quickstart
 
-This will run the example which is a good starting point, excercising all options. The example
+This will run the example which is a good starting point, demonstrating all options. The example
 uses google cloud, though I would appreciate contributed examples for other platforms. After running
 the example you will have a managed server and vm images.
 
