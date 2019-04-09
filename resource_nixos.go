@@ -40,6 +40,7 @@ func resourceNixOS() *schema.Resource {
 			"ssh_opts": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
+				Default:  "-o StrictHostKeyChecking=accept-new -o BatchMode=yes",
 			},
 			"nix_path": &schema.Schema{
 				Type:     schema.TypeString,

@@ -78,9 +78,6 @@ resource "nix_nixos" "nixos" {
   # Path to your nixos config.
   nixos_config = "./configuration.nix"
 
-  # Options passed to ssh when checking or switching your installtation.
-  ssh_opts     = "-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
-
   # Optional values, with defaults.
   
   # Used by nixos-rebuild switch and nixos-rebuild build as --build-host.
@@ -88,8 +85,12 @@ resource "nix_nixos" "nixos" {
 
   # Time to wait for ssh to become responsive. 
   # ssh_timeout = 180
+
+  # Options passed to ssh when checking or switching your installtation.
+  # Note 'accept-new' requires a 'newish' openssh.
+  # ssh_opts     = "-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
   
-  # Run ```nix-collect-garbage -d``` on target host before installing an update.
+  # Run nix-collect-garbage -d on target host before installing an update.
   # collect_garbage = true
   
   # SSH commands will run as this user, note they must be able to install the system,
