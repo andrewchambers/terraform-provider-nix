@@ -86,7 +86,7 @@ resource "nix_nixos" "nixos" {
   # Time to wait for ssh to become responsive. 
   # ssh_timeout = 180
 
-  # Options passed to ssh when checking or switching your installtation.
+  # Options passed to ssh when checking or switching your installation.
   # Note 'accept-new' requires a 'newish' openssh.
   # ssh_opts     = "-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
   
