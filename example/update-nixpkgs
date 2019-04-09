@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+set -eux
+set -o pipefail
+
+channel="nixos-19.03"
+gitrev="$(curl -L https://nixos.org/channels/$channel/git-revision)"
+nixpkgsurl=https://github.com/NixOS/nixpkgs/archive/${gitrev}.tar.gz
+nixpkgshash=$(nix-prefetch-url $nixpkgsurl --unpack)
+
+cat > nixpkgs.nix <<EOF
+let 
+  nixpkgsStr = builtins.fetchTarball {url = "$nixpkgsurl"; sha256 = "$nixpkgshash";};
+  pkgs = (import nixpkgsStr) {};
+in
+  pkgs.runCommand "nixpkgs" {} ''
+    ln -sv \${nixpkgsStr} \$out
+  ''
+EOF

@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+set -eu
+set -o pipefail
+
+exec ssh -o StrictHostKeyChecking=accept-new root@"$(terraform show  | grep assigned_nat_ip | awk '{print $3}')"
