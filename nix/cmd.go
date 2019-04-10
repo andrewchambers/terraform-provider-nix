@@ -10,8 +10,7 @@ import (
 	"strconv"
 )
 
-// like exec.Cmd.Output() except with logging.
-func runCommandWithLogging(c *exec.Cmd) ([]byte, error) {
+func runCommandWithLogging(c *exec.Cmd, stdout io.Writer) error {
 	log.Printf("running %v in env %v", c.Args, c.Env)
 
 	er, ew := io.Pipe()
@@ -35,10 +34,9 @@ func runCommandWithLogging(c *exec.Cmd) ([]byte, error) {
 
 	}
 
-	stdoutSaver := bytes.NewBuffer(nil)
 	stderrSaver := &prefixSuffixSaver{N: 32 << 10}
 	terr := io.TeeReader(er, stderrSaver)
-	tout := io.TeeReader(or, stdoutSaver)
+	tout := io.TeeReader(or, stdout)
 
 	ioDone := make(chan struct{})
 
@@ -58,7 +56,7 @@ func runCommandWithLogging(c *exec.Cmd) ([]byte, error) {
 			err = fmt.Errorf("%s: %v", ee.String(), string(stderrSaver.Bytes()))
 		}
 	}
-	return stdoutSaver.Bytes(), err
+	return err
 }
 
 // prefixSuffixSaver code originally from go stdlib.

@@ -18,8 +18,8 @@ data "nix_build" "nixpkgs" {
 
 data "nix_build" "nixosimage" {
   # The nix path used to build the expression, if not set, it is taken from the environment.
-  nix_path        = "nixpkgs=${data.nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
-  
+  nix_path = "nixpkgs=${data.nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
+
   # Path to the nix expression to build.
   expression_path = "./vmimage.nix"
 }
@@ -70,16 +70,28 @@ resource "google_compute_instance" "exampleserver" {
 
 resource "nix_nixos" "nixos" {
   # Used with nixos-rebuild switch --target-host
-  target_host  = "${google_compute_instance.exampleserver.network_interface.0.access_config.0.nat_ip}"
-  
+  target_host = "${google_compute_instance.exampleserver.network_interface.0.access_config.0.nat_ip}"
+
   # Same as data source above.
-  nix_path     = "nixpkgs=${data.nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
+  nix_path = "nixpkgs=${data.nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
 
   # Path to your nixos config.
   nixos_config = "./configuration.nix"
 
+  # You can run code locally before or after a switch completes.
+  # The default is to do nothing, but this shows how you may use it to ssh into the host.
+  # The pre/post switch hooks are good places to load secrets or other things you may need to do.
+  #
+  pre_switch_hook = <<-EOF
+  #! /bin/sh
+  set -eu
+  ssh $NIX_TARGET_USER@$NIX_TARGET_HOST $NIX_SSHOPTS uname -a
+  EOF
+
   # Optional values, with defaults.
-  
+
+  # post_switch_hook = ""
+
   # Used by nixos-rebuild switch and nixos-rebuild build as --build-host.
   # build_host = "localhost"
 
@@ -89,10 +101,10 @@ resource "nix_nixos" "nixos" {
   # Options passed to ssh when checking or switching your installation.
   # Note 'accept-new' requires a 'newish' openssh.
   # ssh_opts     = "-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
-  
+
   # Run nix-collect-garbage -d on target host before installing an update.
   # collect_garbage = true
-  
+
   # SSH commands will run as this user, note they must be able to install the system,
   # so values other than root mean little.
   # target_user = "root"

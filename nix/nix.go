@@ -1,6 +1,7 @@
 package nix
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -40,28 +41,33 @@ func BuildExpression(nixPath *string, expressionPath string) (string, error) {
 		cmd.Env = []string{fmt.Sprintf("NIX_PATH=%s", os.Getenv("NIX_PATH"))}
 	}
 
-	output, err := runCommandWithLogging(cmd)
+	output := bytes.NewBuffer(nil)
+	err = runCommandWithLogging(cmd, output)
 	if err != nil {
 		return "", fmt.Errorf("building expression failed: %s", formatChildErr(err))
 	}
 
-	return strings.TrimSpace(string(output)), nil
+	return strings.TrimSpace(output.String()), nil
 }
 
 // NixosRebuildConfig represents a configuration for Nixos rebuild.
 type NixosRebuildConfig struct {
-	TargetHost  string
-	TargetUser  string
-	BuildHost   string
-	NixosConfig string
-	NixPath     string
-	SSHOpts     string
+	TargetHost     string
+	TargetUser     string
+	BuildHost      string
+	NixosConfig    string
+	NixPath        string
+	SSHOpts        string
+	PreSwitchHook  string
+	PostSwitchHook string
 }
 
 // GetEnv returns an OS env suitable for nixos-rebuild.
 func (cfg *NixosRebuildConfig) GetEnv() []string {
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("NIX_PATH=%s", cfg.NixPath))
+	env = append(env, fmt.Sprintf("NIX_TARGET_HOST=%s", cfg.TargetHost))
+	env = append(env, fmt.Sprintf("NIX_TARGET_USER=%s", cfg.TargetUser))
 	env = append(env, fmt.Sprintf("NIX_SSHOPTS=%s", cfg.SSHOpts))
 	env = append(env, fmt.Sprintf("NIXOS_CONFIG=%s", cfg.NixosConfig))
 	return env
@@ -110,7 +116,7 @@ func WaitForSSH(user, host, sshOpts string, timeout time.Duration) error {
 	}
 
 	cmd = exec.Command("sh", "-c", fmt.Sprintf("exec timeout 10s ssh %s %s@%s -- true", sshOpts, user, host))
-	_, err = runCommandWithLogging(cmd)
+	err = runCommandWithLogging(cmd, ioutil.Discard)
 	if err != nil {
 		return err
 	}
@@ -135,7 +141,7 @@ func BuildSystem(cfg *NixosRebuildConfig) (string, error) {
 	cmd := exec.Command("nixos-rebuild", "build", "--build-host", cfg.BuildHost)
 	cmd.Dir = tmp
 	cmd.Env = cfg.GetEnv()
-	_, err = runCommandWithLogging(cmd)
+	err = runCommandWithLogging(cmd, ioutil.Discard)
 	if err != nil {
 		return "", formatChildErr(err)
 	}
@@ -146,21 +152,63 @@ func BuildSystem(cfg *NixosRebuildConfig) (string, error) {
 // CurrentSystem returns the store path of the system on the TargetHost.
 func CurrentSystem(cfg *NixosRebuildConfig) (string, error) {
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("exec timeout 10s ssh %s %s@%s -- readlink /run/current-system", cfg.SSHOpts, cfg.TargetUser, cfg.TargetHost))
-	output, err := runCommandWithLogging(cmd)
-	return strings.TrimSpace(string(output)), formatChildErr(err)
+
+	output := bytes.NewBuffer(nil)
+	err := runCommandWithLogging(cmd, output)
+	return strings.TrimSpace(output.String()), formatChildErr(err)
 }
 
 // SwitchSystem is the equivalent of nixos-rebuild switch.
 func SwitchSystem(cfg *NixosRebuildConfig) error {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	env := cfg.GetEnv()
+	hookPath := filepath.Join(tmpDir, "hook")
+
+	runHook := func(hookText string) error {
+		if hookText == "" {
+			return nil
+		}
+
+		err := ioutil.WriteFile(hookPath, []byte(hookText), 0700)
+		if err != nil {
+			return err
+		}
+
+		hook := exec.Command(hookPath)
+		hook.Env = env
+
+		err = runCommandWithLogging(hook, ioutil.Discard)
+		return err
+	}
+
+	err = runHook(cfg.PreSwitchHook)
+	if err != nil {
+		return formatChildErr(err)
+	}
+
 	cmd := exec.Command("nixos-rebuild", "switch", "--build-host", cfg.BuildHost, "--target-host", fmt.Sprintf("%s@%s", cfg.TargetUser, cfg.TargetHost))
-	cmd.Env = cfg.GetEnv()
-	_, err := runCommandWithLogging(cmd)
+	cmd.Env = env
+	err = runCommandWithLogging(cmd, ioutil.Discard)
+	if err != nil {
+		return formatChildErr(err)
+	}
+
+	err = runHook(cfg.PostSwitchHook)
+	if err != nil {
+		return formatChildErr(err)
+	}
+
 	return err
 }
 
 // CollectGarbage runs nix-collect-garbage -d on the remote host.
 func CollectGarbage(user, host, sshOpts string) error {
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("exec ssh %s %s@%s -- nix-collect-garbage -d", sshOpts, user, host))
-	_, err := runCommandWithLogging(cmd)
+	err := runCommandWithLogging(cmd, ioutil.Discard)
 	return formatChildErr(err)
 }

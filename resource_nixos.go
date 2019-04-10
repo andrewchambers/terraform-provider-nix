@@ -60,6 +60,18 @@ func resourceNixOS() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"pre_switch_hook": &schema.Schema{
+				Type:      schema.TypeString,
+				Optional:  true,
+				Default:   "",
+				Sensitive: true,
+			},
+			"post_switch_hook": &schema.Schema{
+				Type:      schema.TypeString,
+				Optional:  true,
+				Default:   "",
+				Sensitive: true,
+			},
 		},
 	}
 }
@@ -72,17 +84,21 @@ type nixosResourceConfig struct {
 	CollectGarbage bool
 	NixPath        string
 	SSHOpts        string
+	PreSwitchHook  string
+	PostSwitchHook string
 	SSHTimeout     time.Duration
 }
 
 func (cfg *nixosResourceConfig) GetRebuildConfig() *nix.NixosRebuildConfig {
 	return &nix.NixosRebuildConfig{
-		TargetHost:  cfg.TargetHost,
-		TargetUser:  cfg.TargetUser,
-		BuildHost:   cfg.BuildHost,
-		NixosConfig: cfg.NixosConfig,
-		NixPath:     cfg.NixPath,
-		SSHOpts:     cfg.SSHOpts,
+		TargetHost:     cfg.TargetHost,
+		TargetUser:     cfg.TargetUser,
+		BuildHost:      cfg.BuildHost,
+		NixosConfig:    cfg.NixosConfig,
+		NixPath:        cfg.NixPath,
+		SSHOpts:        cfg.SSHOpts,
+		PreSwitchHook:  cfg.PreSwitchHook,
+		PostSwitchHook: cfg.PostSwitchHook,
 	}
 }
 
@@ -114,6 +130,8 @@ func getConfig(d resourceLike) (nixosResourceConfig, error) {
 		TargetHost:     d.Get("target_host").(string),
 		TargetUser:     d.Get("target_user").(string),
 		BuildHost:      d.Get("build_host").(string),
+		PreSwitchHook:  d.Get("pre_switch_hook").(string),
+		PostSwitchHook: d.Get("post_switch_hook").(string),
 		NixosConfig:    nixosConfig,
 		NixPath:        nixPath.(string),
 		SSHOpts:        sshOpts.(string),
@@ -148,9 +166,11 @@ func resourceNixOSCreateUpdate(d *schema.ResourceData, m interface{}) error {
 		}
 	}
 
-	err = nix.SwitchSystem(rebuildCfg)
-	if err != nil {
-		return err
+	if d.HasChange("nixos_system") || d.HasChange("target_host") || d.HasChange("pre_switch_hook") || d.HasChange("post_switch_hook") {
+		err = nix.SwitchSystem(rebuildCfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	return resourceNixOSRead(d, m)
