@@ -12,7 +12,6 @@ let
       ];
     };
 
-    users.mutableUsers = false;
   };
 
   nixos = ((import <nixpkgs/nixos>) {

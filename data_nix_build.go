@@ -1,13 +1,15 @@
 package main
 
 import (
+	"os"
+
 	"github.com/andrewchambers/terraform-provider-nix/nix"
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
-func dataSourceNix() *schema.Resource {
+func dataSourceNixBuild() *schema.Resource {
 	return &schema.Resource{
-		Read: resourceNixRead,
+		Read: dataNixBuildRead,
 		Schema: map[string]*schema.Schema{
 			"nix_path": &schema.Schema{
 				Type:     schema.TypeString,
@@ -25,16 +27,15 @@ func dataSourceNix() *schema.Resource {
 	}
 }
 
-func resourceNixRead(d *schema.ResourceData, m interface{}) error {
-	var nixPath *string
+func dataNixBuildRead(d *schema.ResourceData, m interface{}) error {
+	nixPath := os.Getenv("NIX_PATH")
 	if p, ok := d.GetOk("nix_path"); ok {
-		p := p.(string)
-		nixPath = &p
+		nixPath = p.(string)
 	}
 
 	expressionPath := d.Get("expression_path").(string)
 
-	storePath, err := nix.BuildExpression(nixPath, expressionPath)
+	storePath, err := nix.BuildExpression(nixPath, expressionPath, nil)
 	if err != nil {
 		return err
 	}

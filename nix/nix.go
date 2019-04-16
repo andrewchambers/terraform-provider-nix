@@ -25,7 +25,7 @@ func formatChildErr(err error) error {
 }
 
 // BuildExpression builds a nix expression, returning the store path.
-func BuildExpression(nixPath *string, expressionPath string) (string, error) {
+func BuildExpression(nixPath string, expressionPath string, outLink *string) (string, error) {
 
 	tempDir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -33,13 +33,15 @@ func BuildExpression(nixPath *string, expressionPath string) (string, error) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	cmd := exec.Command("nix-build", "--no-link", expressionPath)
+	var cmd *exec.Cmd
 
-	if nixPath != nil {
-		cmd.Env = []string{fmt.Sprintf("NIX_PATH=%s", *nixPath)}
+	if outLink == nil {
+		cmd = exec.Command("nix-build", "--no-link", expressionPath)
 	} else {
-		cmd.Env = []string{fmt.Sprintf("NIX_PATH=%s", os.Getenv("NIX_PATH"))}
+		cmd = exec.Command("nix-build", "-o", *outLink, expressionPath)
 	}
+
+	cmd.Env = []string{fmt.Sprintf("NIX_PATH=%s", nixPath)}
 
 	output := bytes.NewBuffer(nil)
 	err = runCommandWithLogging(cmd, output)

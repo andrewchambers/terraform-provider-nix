@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -102,12 +103,7 @@ func (cfg *nixosResourceConfig) GetRebuildConfig() *nix.NixosRebuildConfig {
 	}
 }
 
-type resourceLike interface {
-	GetOk(string) (interface{}, bool)
-	Get(string) interface{}
-}
-
-func getConfig(d resourceLike) (nixosResourceConfig, error) {
+func getNixosConfig(d resourceLike) (nixosResourceConfig, error) {
 
 	nixPath, ok := d.GetOk("nix_path")
 	if !ok {
@@ -147,7 +143,7 @@ func resourceNixOSCreateUpdate(d *schema.ResourceData, m interface{}) error {
 		d.SetId(randomID())
 	}
 
-	cfg, err := getConfig(d)
+	cfg, err := getNixosConfig(d)
 	if err != nil {
 		return err
 	}
@@ -178,7 +174,7 @@ func resourceNixOSCreateUpdate(d *schema.ResourceData, m interface{}) error {
 
 func resourceNixOSRead(d *schema.ResourceData, m interface{}) error {
 
-	cfg, err := getConfig(d)
+	cfg, err := getNixosConfig(d)
 	if err != nil {
 		return err
 	}
@@ -207,7 +203,7 @@ func resourceNixOSDelete(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceNixOSCustomizeDiff(d *schema.ResourceDiff, m interface{}) error {
-	cfg, err := getConfig(d)
+	cfg, err := getNixosConfig(d)
 	if err != nil {
 		return err
 	}
@@ -215,11 +211,14 @@ func resourceNixOSCustomizeDiff(d *schema.ResourceDiff, m interface{}) error {
 
 	desiredSystem, err := nix.BuildSystem(rebuildCfg)
 	if err != nil {
-		return err
+		log.Printf("build failed, assuming this is because of generated configs. err=%s", err.Error())
+		// If this really is an error, it will be picked up by the switch command.
+		d.SetNewComputed("nixos_system")
+		return nil
 	}
 
 	if d.Get("nixos_system").(string) != desiredSystem {
-		d.SetNew("nixos_system", desiredSystem)
+		d.SetNewComputed("nixos_system")
 	}
 
 	return nil

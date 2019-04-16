@@ -10,5 +10,4 @@
     ];
   };
 
-  users.mutableUsers = false;
 }

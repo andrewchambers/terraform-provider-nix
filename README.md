@@ -28,20 +28,13 @@ terraform apply -var google_cloud_project=your_project_id
 
 To view commands being run, set the env variable TF_LOG=debug.
 
-## Example config and options
+## Example configuration and options
 
 See the example directory for an example configuration with all valid options specified.
 
 ## Status
 
 Working, but want feedback and users.
-
-## Bugs
-
-Doesn't create nix gc roots, so nix garbage collection while
-a deploy is in progress could cause failure in some circumstances, 
-This may be addressed in the future, but the design of the terraform
-plugin infrastructure makes it more annoying than expected.
 
 ## Sponsor Messages
 

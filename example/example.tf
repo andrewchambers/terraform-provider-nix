@@ -9,19 +9,26 @@ provider "google" {
   region  = "us-central1"
 }
 
-data "nix_build" "nixpkgs" {
+resource "nix_build" "nixpkgs" {
   # Path to the nix expression to build.
   # Here we make an explicit version of nix packages
   # for other builds to use.
   expression_path = "./nixpkgs.nix"
+
+  # A nix gc root into the nix store.
+  # Same as what you get from nix-build -o ...
+  out_link = "./pinned_nixpkgs"
 }
 
-data "nix_build" "nixosimage" {
+resource "nix_build" "nixosimage" {
   # The nix path used to build the expression, if not set, it is taken from the environment.
-  nix_path = "nixpkgs=${data.nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
+  nix_path = "nixpkgs=${nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
 
   # Path to the nix expression to build.
   expression_path = "./vmimage.nix"
+
+  # Same as what you get from nix-build -o ...
+  out_link = "./nixosimage"
 }
 
 resource "random_id" "example_suffix" {
@@ -36,7 +43,7 @@ resource "google_storage_bucket" "vmimage_bucket" {
 resource "google_storage_bucket_object" "nixosimage" {
   name   = "nixosimage-${random_id.example_suffix.hex}.raw.tar.gz"
   bucket = "${google_storage_bucket.vmimage_bucket.name}"
-  source = "${data.nix_build.nixosimage.store_path}"
+  source = "${nix_build.nixosimage.store_path}"
 }
 
 resource "google_compute_image" "nixosimage" {
@@ -72,8 +79,8 @@ resource "nix_nixos" "nixos" {
   # Used with nixos-rebuild switch --target-host
   target_host = "${google_compute_instance.exampleserver.network_interface.0.access_config.0.nat_ip}"
 
-  # Same as data source above.
-  nix_path = "nixpkgs=${data.nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
+  # Same as nix_build resources.
+  nix_path = "nixpkgs=${nix_build.nixpkgs.store_path}:sshpubkey=${pathexpand("${var.ssh_pub_key}")}"
 
   # Path to your nixos config.
   nixos_config = "./configuration.nix"
@@ -99,13 +106,12 @@ resource "nix_nixos" "nixos" {
   # ssh_timeout = 180
 
   # Options passed to ssh when checking or switching your installation.
-  # Note 'accept-new' requires a 'newish' openssh.
   # ssh_opts     = "-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 
   # Run nix-collect-garbage -d on target host before installing an update.
   # collect_garbage = true
 
-  # SSH commands will run as this user, note they must be able to install the system,
+  # SSH commands will run as this user, note they must be able to install the system
   # so values other than root mean little.
   # target_user = "root"
 }
