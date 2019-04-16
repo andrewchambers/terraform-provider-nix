@@ -84,6 +84,14 @@ func resourceNixBuildCreateUpdate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
+	if d.HasChange("out_link") {
+		old, _ := d.GetChange("out_link")
+		err = os.Remove(old.(string))
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	linkExists := false
 	_, err = os.Readlink(cfg.OutLink)
 	if err == nil {
