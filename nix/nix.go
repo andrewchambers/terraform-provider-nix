@@ -49,7 +49,11 @@ func BuildExpression(nixPath string, expressionPath string, outLink *string) (st
 		return "", fmt.Errorf("building expression failed: %s", formatChildErr(err))
 	}
 
-	return strings.TrimSpace(output.String()), nil
+	if outLink == nil {
+		return strings.TrimSpace(output.String()), nil
+	} else {
+		return os.Readlink(*outLink)
+	}
 }
 
 // NixosRebuildConfig represents a configuration for Nixos rebuild.
@@ -57,7 +61,7 @@ type NixosRebuildConfig struct {
 	TargetHost     string
 	TargetUser     string
 	BuildHost      string
-	NixosConfig    string
+	NixosConfigPath    string
 	NixPath        string
 	SSHOpts        string
 	PreSwitchHook  string
@@ -71,7 +75,7 @@ func (cfg *NixosRebuildConfig) GetEnv() []string {
 	env = append(env, fmt.Sprintf("NIX_TARGET_HOST=%s", cfg.TargetHost))
 	env = append(env, fmt.Sprintf("NIX_TARGET_USER=%s", cfg.TargetUser))
 	env = append(env, fmt.Sprintf("NIX_SSHOPTS=%s", cfg.SSHOpts))
-	env = append(env, fmt.Sprintf("NIXOS_CONFIG=%s", cfg.NixosConfig))
+	env = append(env, fmt.Sprintf("NIXOS_CONFIG=%s", cfg.NixosConfigPath))
 	return env
 }
 

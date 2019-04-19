@@ -40,16 +40,6 @@ are always the same, until we manually update things by running this script.
 
 Our terraform file uses this version of nixpkgs to build all of our resources.
 
-### vmimage.nix
-
-A nix expression that can build a virtual machine image that runs on google cloud. It has the bare minimum 
-configuration to allow us to ssh in and apply the config from configuration.nix.
-
-### configuration.nix
-
-The configuration of the deployed server, when this changes and terraform apply is executed,
-any changes will be sent to the running server.
-
 ### ssh_into_server
 
 A simple script you can run to get an ssh session on your running server, useful so you don't need

@@ -32,9 +32,15 @@ To view commands being run, set the env variable TF_LOG=debug.
 
 See the example directory for an example configuration with all valid options specified.
 
-## Status
+## Development Status
 
-Working, but want feedback and users.
+Working, but want feedback and users. Currently breaking changes are possible to enhance the 
+design. Breaking changes will be announced on the mailing list.
+
+## Contact
+
+- [Mailing list](https://lists.sr.ht/~ach/terraform-provider-nix)
+- File an issue on github.
 
 ## Sponsor Messages
 

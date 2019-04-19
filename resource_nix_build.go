@@ -20,6 +20,10 @@ func resourceNixBuild() *schema.Resource {
 		CustomizeDiff: resourceNixBuildCustomizeDiff,
 
 		Schema: map[string]*schema.Schema{
+			"expression": &schema.Schema{
+				Type:     schema.TypeString,
+				Optional: true,
+			},
 			"expression_path": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
@@ -41,9 +45,37 @@ func resourceNixBuild() *schema.Resource {
 }
 
 type nixBuildResourceConfig struct {
+	Expression     string
 	ExpressionPath string
 	NixPath        string
 	OutLink        string
+}
+
+func (cfg *nixBuildResourceConfig) DoBuild() (string, error) {
+	return cfg.doBuild(&cfg.OutLink)
+}
+
+func (cfg *nixBuildResourceConfig) DoBuildNoLink() (string, error) {
+	return cfg.doBuild(nil)
+}
+
+func (cfg *nixBuildResourceConfig) doBuild(outLink *string) (string, error) {
+	if cfg.Expression != "" {
+		f, err := os.Create(cfg.ExpressionPath)
+		if err != nil {
+			return "", err
+		}
+		_, err = f.Write([]byte(cfg.Expression))
+		if err != nil {
+			return "", err
+		}
+		err = f.Close()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return nix.BuildExpression(cfg.NixPath, cfg.ExpressionPath, outLink)
 }
 
 func getBuildConfig(d resourceLike) (nixBuildResourceConfig, error) {
@@ -52,6 +84,8 @@ func getBuildConfig(d resourceLike) (nixBuildResourceConfig, error) {
 	if p, ok := d.GetOk("nix_path"); ok {
 		nixPath = p.(string)
 	}
+
+	expression, _ := d.GetOk("expression")
 
 	expressionPath := d.Get("expression_path").(string)
 	expressionPath, err := filepath.Abs(expressionPath)
@@ -67,6 +101,7 @@ func getBuildConfig(d resourceLike) (nixBuildResourceConfig, error) {
 
 	return nixBuildResourceConfig{
 		NixPath:        nixPath,
+		Expression:     expression.(string),
 		ExpressionPath: expressionPath,
 		OutLink:        outLink,
 	}, nil
@@ -92,6 +127,18 @@ func resourceNixBuildCreateUpdate(d *schema.ResourceData, m interface{}) error {
 		}
 	}
 
+	// Delete the old expression if it was under out control.
+	if d.HasChange("expression_path") {
+		oldExpression, _ := d.GetChange("expression")
+		if oldExpression != "" {
+			old, _ := d.GetChange("expression_path")
+			err = os.Remove(old.(string))
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
+	}
+
 	linkExists := false
 	_, err = os.Readlink(cfg.OutLink)
 	if err == nil {
@@ -99,7 +146,7 @@ func resourceNixBuildCreateUpdate(d *schema.ResourceData, m interface{}) error {
 	}
 
 	if d.IsNewResource() || d.HasChange("store_path") || !linkExists {
-		_, err = nix.BuildExpression(cfg.NixPath, cfg.ExpressionPath, &cfg.OutLink)
+		_, err = cfg.DoBuild()
 		if err != nil {
 			return err
 		}
@@ -134,6 +181,13 @@ func resourceNixBuildDelete(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
+	if cfg.Expression != "" {
+		err = os.Remove(cfg.ExpressionPath)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	err = os.Remove(cfg.OutLink)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -160,12 +214,19 @@ func resourceNixBuildExists(d *schema.ResourceData, m interface{}) (bool, error)
 }
 
 func resourceNixBuildCustomizeDiff(d *schema.ResourceDiff, m interface{}) error {
+	// A trick to prevent prematurely writing nix expressions to disks path
+	// when this is the first diff.
+	if d.HasChange("expression") {
+		d.SetNewComputed("store_path")
+		return nil
+	}
+
 	cfg, err := getBuildConfig(d)
 	if err != nil {
 		return err
 	}
 
-	desiredBuild, err := nix.BuildExpression(cfg.NixPath, cfg.ExpressionPath, nil)
+	desiredBuild, err := cfg.DoBuildNoLink()
 	if err != nil {
 		log.Printf("build failed, assuming this is because of generated expression. err=%s", err.Error())
 		d.SetNewComputed("store_path")
