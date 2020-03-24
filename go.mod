@@ -1,3 +1,5 @@
 module github.com/andrewchambers/terraform-provider-nix
 
-require github.com/hashicorp/terraform v0.11.13
+go 1.14
+
+require github.com/hashicorp/terraform v0.12.7
