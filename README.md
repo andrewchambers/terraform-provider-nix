@@ -44,8 +44,6 @@ design. Breaking changes will be announced on the mailing list.
 
 ## Sponsor Messages
 
-This project was sponsored by [backupbox.io](https://backupbox.io)
-
 ... *Your message here*
 
 ## Sponsoring
